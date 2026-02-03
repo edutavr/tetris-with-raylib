@@ -1,0 +1,3 @@
+- create different color themes, and for each theme, make blocks correspond its color;
+- set an option for colorful blocks;
+- leaderboard menu
