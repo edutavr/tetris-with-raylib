@@ -1,3 +1,5 @@
 #!/bin/bash
-gcc -o tetris.exe main.c  -I include -L lib -lraylib -lgdi32 -lwinmm
+
+gcc -o tetris.exe main.c  -I include -L lib -lraylib -lgdi32 -lwinmm -ggdb
+
 ./tetris.exe

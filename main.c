@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include <stdbool.h>
 
 #define COLS 12 //2 extra columns to the walls
 #define ROWS 21 //1 extra wall to the floor
@@ -27,14 +28,64 @@ typedef struct ThemeColors{
   const char *name;
 }ThemeColors;
 
-static const ThemeColors Themes[THEME_COUNT] = {
-  [PURPLE_THEME]={PURPLE, DARKPURPLE, BLACK, "Purple"},
-  [RED_THEME]={RED, MAROON, RAYWHITE, "Red"},
-  [GREEN_THEME]={GREEN, DARKGREEN, LIME, "Green"},
-  [BLUE_THEME]={BLUE, DARKBLUE, SKYBLUE, "Blue"},
-  [YELLOW_THEME]={YELLOW, GOLD, (Color){111,118,17,255}, "Yellow"},
-  [ORANGE_THEME]={ORANGE, (Color){230,76,20,255},(Color){168,63,24,255} , "Orange"},
-};
+
+static bool itsOver = false;
+static bool pieceActive = false;
+static int pieceX = 0;
+static int pieceY = 0;
+
+static void GenerateTestPiece(){
+  pieceX = (COLS - 2) / 2;
+  pieceY = 0;
+
+  //Game over decided at the spawnpoint
+  if (grid[pieceX][pieceY] == PLACED_PIECE ||
+      grid[pieceX+1][pieceY] == PLACED_PIECE ||
+      grid[pieceX][pieceY+1] == PLACED_PIECE ||
+      grid[pieceX+1][pieceY+1] == PLACED_PIECE) {
+    itsOver = true;
+    pieceActive = false;
+    return;
+  }
+  
+  //Square piece for tests
+  grid[pieceX][pieceY] = MOVING_PIECE;
+  grid[pieceX+1][pieceY] = MOVING_PIECE;
+  grid[pieceX][pieceY+1] = MOVING_PIECE;
+  grid[pieceX+1][pieceY+1] = MOVING_PIECE;
+  
+  pieceActive = true;
+}
+
+static void TickFall(){
+  for (int y = ROWS - 2; y >= 0; y--) {
+    for (int x = 1; x < COLS - 1; x++) {
+      if (grid[x][y] == MOVING_PIECE) {
+	//The condition below will verify if there's something that blocks the piece's fall. If so, it turns into a placed piece.
+	if (grid[x][y+1] == PLACED_PIECE || grid[x][y+1] == BOARD_LIMIT){
+	  for (int yy = 0; yy < ROWS; yy++){
+	    for (int xx = 0; xx < COLS; xx++){
+	      if (grid[xx][yy] == MOVING_PIECE){
+		grid[xx][yy] = PLACED_PIECE;
+		pieceActive = false;
+	      }
+	    }
+	  }
+	}
+      }
+    }
+  }
+  
+  //operates from the below to the above. If theres no collision, it keep going down.
+  for (int y = ROWS - 2; y >= 0; y--) {
+    for (int x = 1; x < COLS - 1; x++) {
+      if (grid[x][y] == MOVING_PIECE) {
+	grid[x][y+1] = MOVING_PIECE;
+	grid[x][y] = EMPTY;
+      }
+    }
+  }
+}
 
 static void GenerateGrid(){
   for(int x = 0; x < COLS; x++){
@@ -49,54 +100,90 @@ static void GenerateGrid(){
 }
 
 static void GridGraphic(){
-    for (int y = 0; y < ROWS; y++)
-    {
-        for (int x = 0; x < COLS; x++)
-        {
-            int xPos = BOARD_X_AXIS + x * SQUARE_SIZE;
+  for (int y = 0; y < ROWS; y++)
+      {
+      for (int x = 0; x < COLS; x++)
+	  {
+	  int xPos = BOARD_X_AXIS + x * SQUARE_SIZE;
             int yPos = BOARD_Y_AXIS + y * SQUARE_SIZE;
-
+	    
             switch (grid[x][y])
-            {
-                case EMPTY:
-                    DrawRectangleLines(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, LIGHTGRAY);
-                    break;
-
-                case MOVING_PIECE:
-                    DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, DARKGRAY);
-                    break;
-
-                case PLACED_PIECE:
-                    DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, GRAY);
-                    break;
-
-                case CLEAN_LINE:
-                    DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, ORANGE);
-                    break;
-
-                case BOARD_LIMIT:
-		  DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, LIGHTGRAY);
-                    break;
-            }
+	      {
+	      case EMPTY:
+		DrawRectangleLines(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, LIGHTGRAY);
+		break;
+		
+	      case MOVING_PIECE:
+		DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, DARKGRAY);
+		break;
+		
+	      case PLACED_PIECE:
+		DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, GRAY);
+		break;
+		
+	      case CLEAN_LINE:
+		DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, ORANGE);
+		break;
+		
+	      case BOARD_LIMIT:
+		DrawRectangle(xPos, yPos, SQUARE_SIZE, SQUARE_SIZE, LIGHTGRAY);
+		break;	  
+	      }
         }
     }
 }
 
 static int frameCounter=0;
 
+static int scrollSpeed = 20;
+
 static void UpdateGameplay(){
-    frameCounter++;
-    if (frameCounter >= 60)//60fps
-    {
-        frameCounter = 0;
-    }
+  
+  if(itsOver){
+    return;   
+  }
+  
+  if (!pieceActive) {
+    GenerateTestPiece();
+  }
+  
+  if (itsOver){
+    return;
+  }
+  
+  frameCounter+=scrollSpeed;
+  if (frameCounter >= 60) {
+    frameCounter = 0;
+    TickFall();
+  }
+  
 }
+
+/*static void RestartGame(){
+  itsOver = false;
+  pieceActive = false;
+  frameCounter = 0;
+
+  GenerateGrid();
+ }*/
 
 
 int main() {
+
+  ThemeColors Themes[THEME_COUNT] = {
+    [PURPLE_THEME]={PURPLE, DARKPURPLE, BLACK, "Purple"},
+    [RED_THEME]={RED, MAROON, RAYWHITE, "Red"},
+    [GREEN_THEME]={GREEN, DARKGREEN, LIME, "Green"},
+    [BLUE_THEME]={BLUE, DARKBLUE, SKYBLUE, "Blue"},
+    [YELLOW_THEME]={YELLOW, GOLD, (Color){111,118,17,255}, "Yellow"},
+    [ORANGE_THEME]={ORANGE, (Color){230,76,20,255},(Color){168,63,24,255} , "Orange"},
+  };
+  
   const int screenWidth = 800;
   const int screenHeight = 600;
   const char *title = "TETRIS BETA V0.1 by edutavr";
+  const char *gameOver = "GAME OVER";
+  const char *restartText="Click here to restart";
   int fontSize = 45; 
 
   InitWindow(screenWidth, screenHeight, "TETRIS BETA V0.1");
@@ -116,6 +203,8 @@ int main() {
   int centerPlay = (screenWidth - textWidth2)/2;
   int centerSettings = (screenWidth - textWidth3)/2;
 
+  int goSize;
+  int restartSize;
 
   Rectangle playButton = { centerPlay, 240, textWidth2, 40 };
   Rectangle settingsButton = { centerSettings, 300, textWidth3, 40 };
@@ -161,6 +250,18 @@ int main() {
        }
      }break;
      case GAMEPLAY:{
+       UpdateGameplay();
+       
+       if (CheckCollisionPointRec(mousePoint, backToTheBegginning)) {
+	 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+	   currentScreen = MAINSCREEN;
+	 }
+       }
+       
+       if (itsOver && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+	 RestartGame();
+       }
+       
        if (CheckCollisionPointRec(mousePoint, backToTheBegginning)) {
 	 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 	   currentScreen = MAINSCREEN;
@@ -185,12 +286,31 @@ int main() {
       DrawText(themeLabel, centerPlay + 25 , 550, 20, themeColor);
       break;
       
-    case(GAMEPLAY):{
-      UpdateGameplay();
-      ClearBackground(BLACK);
-      DrawText("TELA DO JOGO", 20, 20, 20, WHITE);
-      GridGraphic();
-      break;}
+case (GAMEPLAY): {
+    ClearBackground(BLACK);
+    DrawText("TELA DO JOGO", 20, 20, 20, WHITE);
+    GridGraphic();
+
+    if (itsOver) {
+        const int goSize = 50;
+        const int restartSize = 20;
+
+        int goWidth = MeasureText(gameOver, goSize);
+        int restartWidth = MeasureText(restartText, restartSize);
+
+        int centerX = screenWidth / 2;
+
+        DrawRectangle(180, 200, 440, 180, (Color){0, 0, 0, 200});
+        DrawRectangleLines(180, 200, 440, 180, RAYWHITE);
+
+        DrawText(gameOver, centerX - goWidth / 2 ,230, goSize, RED);
+
+        DrawText(restartText, centerX - restartWidth / 2, 300, restartSize, RAYWHITE);
+    }
+
+    break;
+}
+
 
     case(SETTINGS):
       ClearBackground(bgColor);
